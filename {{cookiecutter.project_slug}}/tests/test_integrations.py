@@ -4,9 +4,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from {{ cookiecutter.project_slug | replace('-', '_') }}.integrations.hub import NotificationHub
-from {{ cookiecutter.project_slug | replace('-', '_') }}.integrations.slack import SlackClient
 from {{ cookiecutter.project_slug | replace('-', '_') }}.integrations.jira import JiraClient
 from {{ cookiecutter.project_slug | replace('-', '_') }}.integrations.linear import LinearClient
+from {{ cookiecutter.project_slug | replace('-', '_') }}.integrations.slack import SlackClient
 from {{ cookiecutter.project_slug | replace('-', '_') }}.integrations.telegram import TelegramClient
 
 

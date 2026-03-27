@@ -8,10 +8,10 @@ from {{ cookiecutter.project_slug | replace('-', '_') }}.orchestrator import Pip
 
 class TestPipeline:
     @patch("{{ cookiecutter.project_slug | replace('-', '_') }}.orchestrator.Agent")
-    def test_full_pipeline_calls_all_agents(self, MockAgent, config):
+    def test_full_pipeline_calls_all_agents(self, mock_agent_cls, config):
         mock_instance = MagicMock()
         mock_instance.run.return_value = "agent output"
-        MockAgent.return_value = mock_instance
+        mock_agent_cls.return_value = mock_instance
 
         pipeline = Pipeline(config=config)
         results = pipeline.run("build a login page")
@@ -20,10 +20,10 @@ class TestPipeline:
         assert mock_instance.run.call_count == 9
 
     @patch("{{ cookiecutter.project_slug | replace('-', '_') }}.orchestrator.Agent")
-    def test_fast_track_calls_fewer_agents(self, MockAgent, config):
+    def test_fast_track_calls_fewer_agents(self, mock_agent_cls, config):
         mock_instance = MagicMock()
         mock_instance.run.return_value = "agent output"
-        MockAgent.return_value = mock_instance
+        mock_agent_cls.return_value = mock_instance
 
         pipeline = Pipeline(config=config)
         results = pipeline.run_fast_track("fix typo in readme")

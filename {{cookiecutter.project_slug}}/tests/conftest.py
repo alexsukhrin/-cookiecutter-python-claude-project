@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -16,7 +15,11 @@ def project_root(tmp_path: Path) -> Path:
     (tmp_path / ".mcp.json").write_text('{"mcpServers": {}}')
     (tmp_path / "tasks").mkdir()
     agents_dir = tmp_path / "agents"
-    for role in ("project-manager", "tech-lead", "architect", "developer", "tester"):
+    roles = (
+        "business-analyst", "project-manager", "tech-lead",
+        "architect", "developer", "tester",
+    )
+    for role in roles:
         role_dir = agents_dir / role
         role_dir.mkdir(parents=True)
         (role_dir / "CLAUDE.md").write_text(f"# Agent: {role}")
