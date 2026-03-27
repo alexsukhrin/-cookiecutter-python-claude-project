@@ -15,6 +15,11 @@
   "enable_jira_mcp": ["no", "yes"],
   "jira_instance_url": "",
   "jira_project_key": "",
+  "jira_assignee": "",
+
+  "enable_confluence_mcp": ["no", "yes"],
+  "confluence_url": "",
+  "confluence_space_key": "",
 
   "enable_github_mcp": ["yes", "no"],
 

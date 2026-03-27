@@ -25,6 +25,11 @@ def validate():
             and not "{{ cookiecutter.slack_team_id }}".strip(),
             "Slack MCP enabled but slack_team_id is empty.",
         ),
+        (
+            "{{ cookiecutter.enable_confluence_mcp }}" == "yes"
+            and not "{{ cookiecutter.confluence_url }}".strip(),
+            "Confluence enabled but confluence_url is empty.",
+        ),
     ]
 
     for condition, message in checks:

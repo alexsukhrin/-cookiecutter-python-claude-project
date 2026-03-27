@@ -1,4 +1,4 @@
-"""Jira integration -- create and update issues for pipeline tasks."""
+"""Jira integration -- create/update issues, watch for new tickets, validate completeness."""
 from __future__ import annotations
 
 import base64
@@ -16,7 +16,16 @@ STATUS_MAP = {
     "approved": "To Do",
     "in_progress": "In Progress",
     "done": "Done",
+    "review": "In Review",
 }
+
+# Fields the PM agent expects to be filled in a Jira ticket
+REQUIRED_FIELDS = [
+    "summary",
+    "description",
+    "priority",
+    "issuetype",
+]
 
 
 @dataclass
@@ -143,3 +152,122 @@ class JiraClient:
 
         logger.warning("Transition '%s' not found for %s", target, issue_key)
         return False
+
+    # --- Watcher: fetch new/updated tickets ---
+
+    def fetch_assigned_issues(
+        self, assignee: str | None = None, status: str = "To Do"
+    ) -> list[dict]:
+        """Fetch issues assigned to a user/bot in a given status.
+
+        Args:
+            assignee: Jira username or account ID. Defaults to JIRA_ASSIGNEE env var.
+            status: Jira status to filter (default: "To Do").
+
+        Returns:
+            List of issue dicts with key, summary, description, priority, status.
+        """
+        assignee = assignee or os.getenv("JIRA_ASSIGNEE", "")
+        if not assignee:
+            logger.warning("No JIRA_ASSIGNEE configured, cannot watch tickets")
+            return []
+
+        jql = (
+            f'project = "{self.project_key}" '
+            f'AND assignee = "{assignee}" '
+            f'AND status = "{status}" '
+            f"ORDER BY created DESC"
+        )
+        import urllib.parse
+        encoded_jql = urllib.parse.quote(jql)
+        result = self._request("GET", f"search?jql={encoded_jql}&maxResults=50")
+        if not result:
+            return []
+
+        issues = []
+        for item in result.get("issues", []):
+            fields = item.get("fields", {})
+            desc_text = self._extract_text(fields.get("description"))
+            issues.append({
+                "key": item["key"],
+                "summary": fields.get("summary", ""),
+                "description": desc_text,
+                "priority": fields.get("priority", {}).get("name", "Medium"),
+                "status": fields.get("status", {}).get("name", ""),
+                "issue_type": fields.get("issuetype", {}).get("name", "Task"),
+                "reporter": fields.get("reporter", {}).get("displayName", ""),
+            })
+        return issues
+
+    def get_issue(self, issue_key: str) -> dict | None:
+        """Get full issue details."""
+        result = self._request("GET", f"issue/{issue_key}")
+        if not result:
+            return None
+        fields = result.get("fields", {})
+        return {
+            "key": result["key"],
+            "summary": fields.get("summary", ""),
+            "description": self._extract_text(fields.get("description")),
+            "priority": fields.get("priority", {}).get("name", "Medium"),
+            "status": fields.get("status", {}).get("name", ""),
+            "issue_type": fields.get("issuetype", {}).get("name", "Task"),
+            "reporter": fields.get("reporter", {}).get("displayName", ""),
+            "acceptance_criteria": self._extract_text(
+                fields.get("customfield_10100")  # Common AC field; adjust per instance
+            ),
+        }
+
+    def get_comments(self, issue_key: str) -> list[dict]:
+        """Get all comments on an issue."""
+        result = self._request("GET", f"issue/{issue_key}/comment")
+        if not result:
+            return []
+        comments = []
+        for c in result.get("comments", []):
+            comments.append({
+                "id": c["id"],
+                "author": c.get("author", {}).get("displayName", ""),
+                "body": self._extract_text(c.get("body")),
+                "created": c.get("created", ""),
+            })
+        return comments
+
+    def validate_ticket_completeness(self, issue: dict) -> list[str]:
+        """Check if a Jira ticket has all required information.
+
+        Returns a list of missing/incomplete fields.
+        """
+        missing = []
+        if not issue.get("summary", "").strip():
+            missing.append("summary")
+        if not issue.get("description", "").strip():
+            missing.append("description")
+        if len(issue.get("description", "")) < 20:
+            missing.append("description (too short -- need more details)")
+        if not issue.get("priority"):
+            missing.append("priority")
+        return missing
+
+    @staticmethod
+    def _extract_text(adf_content: dict | None) -> str:
+        """Extract plain text from Atlassian Document Format (ADF)."""
+        if not adf_content:
+            return ""
+        if isinstance(adf_content, str):
+            return adf_content
+
+        texts: list[str] = []
+
+        def _walk(node: dict | list) -> None:
+            if isinstance(node, list):
+                for item in node:
+                    _walk(item)
+            elif isinstance(node, dict):
+                if node.get("type") == "text":
+                    texts.append(node.get("text", ""))
+                for child in node.get("content", []):
+                    _walk(child)
+
+        _walk(adf_content)
+        return "\n".join(texts)

@@ -99,7 +99,7 @@ class Pipeline:
                 f"Close task and update tracking:\n\n{results['tl_signoff']}",
             )
 
-            self.notifications.on_pipeline_complete(request)
+            self.notifications.on_pipeline_complete(request, results)
         except AgentError as e:
             self.notifications.on_pipeline_failed(request, str(e))
             raise
@@ -133,9 +133,157 @@ class Pipeline:
                 f"Sign off:\n\n{results['tester_validate']}",
             )
 
-            self.notifications.on_pipeline_complete(request)
+            self.notifications.on_pipeline_complete(request, results)
         except AgentError as e:
             self.notifications.on_pipeline_failed(request, str(e))
             raise
 
         return results
+
+    def run_from_jira(self, issue_key: str) -> dict[str, str]:
+        """Run pipeline from an existing Jira ticket.
+
+        Full flow:
+        1. Fetch ticket from Jira
+        2. PM validates completeness, asks questions in comments if needed
+        3. PM enriches ticket using task template
+        4. Run full pipeline (TL -> Arch -> Dev -> Tester)
+        5. Publish results to Confluence
+        6. Transition Jira to "Review" for customer verification
+        """
+        jira = self.notifications.jira
+        if not jira.enabled:
+            raise RuntimeError("Jira integration required for run_from_jira")
+
+        # 1. Fetch ticket
+        logger.info("=== Fetching Jira ticket: %s ===", issue_key)
+        issue = jira.get_issue(issue_key)
+        if not issue:
+            raise RuntimeError(f"Could not fetch Jira issue: {issue_key}")
+
+        # Link this pipeline run to the existing Jira ticket
+        self.notifications.set_jira_issue(issue_key)
+
+        # 2. PM validates ticket completeness
+        missing = jira.validate_ticket_completeness(issue)
+        if missing:
+            question = (
+                f"Ticket {issue_key} is missing required information:\n"
+                + "\n".join(f"- {m}" for m in missing)
+                + "\n\nPlease provide the missing details."
+            )
+            jira.add_comment(issue_key, question)
+            logger.warning(
+                "Ticket %s incomplete, asked reporter in comments: %s",
+                issue_key, missing
+            )
+
+        # 3. PM enriches ticket via agent
+        request_text = (
+            f"Jira Ticket: {issue_key}\n"
+            f"Summary: {issue['summary']}\n"
+            f"Description: {issue['description']}\n"
+            f"Priority: {issue['priority']}\n"
+            f"Reporter: {issue['reporter']}\n"
+            f"Type: {issue['issue_type']}"
+        )
+
+        results: dict[str, str] = {}
+        self.notifications.on_pipeline_start(request_text)
+
+        try:
+            # PM intake -- validate and enrich
+            results["pm_intake"] = self._run_step(
+                "Step 1: PM Validate & Enrich", "project-manager",
+                f"Validate and enrich this Jira ticket. "
+                f"Check if all acceptance criteria are clear. "
+                f"Create a local task file using the template from "
+                f"projects/.templates/task.md.\n\n{request_text}",
+            )
+
+            # Standard pipeline from here
+            results["tl_decompose"] = self._run_step(
+                "Step 2: Tech Lead Decompose", "tech-lead",
+                f"Decompose into spec and subtasks:\n\n{results['pm_intake']}",
+            )
+
+            results["arch_design"] = self._run_step(
+                "Step 3: Architect Design", "architect",
+                f"Create architecture document:\n\n{results['tl_decompose']}",
+            )
+
+            results["tl_validate_arch"] = self._run_step(
+                "Step 4: Tech Lead Validate Architecture", "tech-lead",
+                f"Validate architecture:\n\n{results['arch_design']}",
+            )
+
+            results["dev_implement"] = self._run_step(
+                "Step 5: Developer Implement", "developer",
+                f"Implement according to approved architecture:\n\n"
+                f"Spec: {results['tl_decompose']}\n\n"
+                f"Architecture: {results['arch_design']}",
+            )
+
+            results["arch_validate_code"] = self._run_step(
+                "Step 6: Architect Validate Code", "architect",
+                f"Validate implementation matches design:\n\n{results['dev_implement']}",
+            )
+
+            results["tester_validate"] = self._run_step(
+                "Step 7: Tester Validate", "tester",
+                f"Create test plan and validate:\n\n"
+                f"Spec: {results['tl_decompose']}\n\n"
+                f"Implementation: {results['dev_implement']}",
+            )
+
+            results["tl_signoff"] = self._run_step(
+                "Step 8: Tech Lead Sign-off", "tech-lead",
+                f"Final sign-off review:\n\n"
+                f"Test results: {results['tester_validate']}\n\n"
+                f"Implementation: {results['dev_implement']}",
+            )
+
+            results["pm_close"] = self._run_step(
+                "Step 9: PM Close & Document", "project-manager",
+                f"Close task. Update Jira {issue_key}. "
+                f"Summarize results for documentation.\n\n{results['tl_signoff']}",
+            )
+
+            # Pipeline complete -> Confluence docs + Jira to Review
+            self.notifications.on_pipeline_complete(request_text, results)
+
+        except AgentError as e:
+            self.notifications.on_pipeline_failed(request_text, str(e))
+            raise
+
+        logger.info("=== Pipeline Complete for %s ===", issue_key)
+        return results
+
+    def watch_jira(self, assignee: str | None = None) -> list[dict[str, str]]:
+        """Watch Jira for new tickets and run pipeline for each.
+
+        Fetches all "To Do" tickets assigned to the configured user,
+        and runs the full Jira-driven pipeline for each.
+
+        Returns:
+            List of results dicts, one per processed ticket.
+        """
+        jira = self.notifications.jira
+        if not jira.enabled:
+            raise RuntimeError("Jira integration required for watch_jira")
+
+        issues = jira.fetch_assigned_issues(assignee=assignee)
+        if not issues:
+            logger.info("No new Jira tickets found")
+            return []
+
+        logger.info("Found %d new Jira ticket(s) to process", len(issues))
+        all_results = []
+        for issue in issues:
+            try:
+                result = self.run_from_jira(issue["key"])
+                all_results.append(result)
+            except Exception as e:
+                logger.error("Failed to process %s: %s", issue["key"], e)
+
+        return all_results

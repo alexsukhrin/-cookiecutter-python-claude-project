@@ -42,6 +42,12 @@
       "args": ["-y", "@modelcontextprotocol/server-postgres", "{{ cookiecutter.postgres_connection_string }}"]
     },
 {%- endif %}
+{%- if cookiecutter.enable_confluence_mcp == "yes" %}
+    "confluence": {
+      "type": "http",
+      "url": "{{ cookiecutter.confluence_url }}/gateway/api/mcp"
+    },
+{%- endif %}
 {%- if cookiecutter.enable_filesystem_mcp == "yes" %}
     "filesystem": {
       "command": "npx",

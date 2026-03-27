@@ -70,6 +70,45 @@ def agent(role: str, task: str) -> None:
         sys.exit(1)
 
 
+@main.command(name="jira-run")
+@click.argument("issue_key")
+def jira_run(issue_key: str) -> None:
+    """Run pipeline from an existing Jira ticket."""
+    config = Config()
+    if not config.anthropic_api_key:
+        click.echo("Error: ANTHROPIC_API_KEY not set. Check your .env file.", err=True)
+        sys.exit(1)
+
+    pipeline = Pipeline(config=config)
+    try:
+        results = pipeline.run_from_jira(issue_key)
+        click.echo(f"\n=== Pipeline Complete for {issue_key} ===")
+        for step, output in results.items():
+            click.echo(f"\n--- {step} ---")
+            click.echo(output[:500] if len(output) > 500 else output)
+    except Exception as e:
+        click.echo(f"Pipeline failed: {e}", err=True)
+        sys.exit(1)
+
+
+@main.command(name="jira-watch")
+@click.option("--assignee", "-a", default=None, help="Jira assignee to watch.")
+def jira_watch(assignee: str | None) -> None:
+    """Watch Jira for new tickets and process them."""
+    config = Config()
+    if not config.anthropic_api_key:
+        click.echo("Error: ANTHROPIC_API_KEY not set. Check your .env file.", err=True)
+        sys.exit(1)
+
+    pipeline = Pipeline(config=config)
+    try:
+        all_results = pipeline.watch_jira(assignee=assignee)
+        click.echo(f"\nProcessed {len(all_results)} ticket(s)")
+    except Exception as e:
+        click.echo(f"Watch failed: {e}", err=True)
+        sys.exit(1)
+
+
 @main.command()
 def status() -> None:
     """Show current project and task status."""
