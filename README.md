@@ -1,30 +1,86 @@
 # cookiecutter-python-claude-project
 
-Cookiecutter template for multi-agent AI orchestration projects powered by **Claude CLI**.
+Cookiecutter template for **multi-agent AI orchestration** projects powered by Claude CLI.
 
-Generates a fully structured Python project where 5 specialized AI agents (Project Manager, Tech Lead, Architect, Developer, Tester) collaborate through a sequential validation pipeline.
+## Why
+
+Setting up a multi-agent development workflow from scratch takes days: agent roles, validation pipelines, issue tracker integration, documentation generation, CLI tooling. This template generates a production-ready project in seconds with everything wired together.
+
+## What It Does
+
+Generates a Python project where **6 specialized AI agents** collaborate through a structured validation pipeline:
+
+```
+Jira/Linear ticket
+    |
+    v
+Business Analyst -- evaluate value, estimate, prioritize, decide
+    |
+    v  (Approved)
+Project Manager -- validate ticket, enrich, create task
+    |
+    v
+Tech Lead -- decompose into spec + subtasks
+    |
+    v
+Architect -- design -> architecture.md
+    |
+    v
+Developer -- implement following architecture
+    |
+    v
+Tester -- validate, report defects
+    |
+    v
+Tech Lead -- final sign-off
+    |
+    v
+Project Manager -- close task, publish to Confluence
+```
+
+The BA can **reject or pause** a ticket before any development starts (Needs Info / On Hold / Decline).
 
 ## Features
 
-- **Multi-agent pipeline** -- 5 agents with defined roles, responsibilities, and validation relationships
-- **Claude CLI integration** -- agents invoke Claude Code under the hood via subprocess
-- **MCP server support** -- Linear, Jira, GitHub, Slack, Telegram, PostgreSQL, Filesystem
-- **Python package** -- proper `src/` layout with Click CLI, pytest tests, ruff linting
-- **Orchestration engine** -- full pipeline and fast-track modes
-- **CI/CD** -- GitHub Actions for testing and manual pipeline dispatch
-- **Docker** -- optional containerized setup with Node.js for MCP servers
-- **Git workflow** -- conventional commits, feature branches, PR-based reviews
+- **6-agent pipeline** with Business Analyst triage gate
+- **Claude CLI under the hood** -- each agent is a Claude Code invocation with dedicated CLAUDE.md
+- **Jira-driven flow** -- watch tickets, BA triage, auto-process, comment results back
+- **Confluence** -- auto-publish pipeline results as documentation pages
+- **MCP servers** -- Jira, Linear, GitHub, Slack, Telegram, PostgreSQL, Confluence, Filesystem
+- **Python CLI** -- `run`, `agent`, `jira-run`, `jira-watch`, `status` commands
+- **Tested scaffold** -- 21 passing tests, ruff clean, mypy-ready
+- **Optional** -- Docker, GitHub Actions CI/CD
 
 ## Quick Start
 
 ```bash
-pip install cookiecutter
-cookiecutter gh:alexsukhrin/cookiecutter-python-claude-project
+pipx run cookiecutter gh:alexsukhrin/-cookiecutter-python-claude-project
 ```
 
-Or with pipx:
+Then:
 ```bash
-pipx run cookiecutter gh:alexsukhrin/cookiecutter-python-claude-project
+cd my-project
+bash scripts/setup.sh
+cp .env.example .env   # add ANTHROPIC_API_KEY + integration tokens
+```
+
+## Usage
+
+```bash
+# Full pipeline from a text request
+make pipeline REQUEST="Add user authentication with JWT"
+
+# Process a Jira ticket (BA triage -> pipeline -> Confluence)
+my-project jira-run PROJ-123
+
+# Watch Jira for new tickets and auto-process
+my-project jira-watch --assignee bot@company.com
+
+# Run a single agent
+make agent ROLE=developer TASK=TASK-001
+
+# Direct Claude CLI
+claude -p "$(cat agents/developer/CLAUDE.md)" --mcp-config .mcp.json "implement TASK-001"
 ```
 
 ## Template Variables
@@ -32,95 +88,63 @@ pipx run cookiecutter gh:alexsukhrin/cookiecutter-python-claude-project
 | Variable | Default | Description |
 |---|---|---|
 | `project_name` | My Claude Agent Project | Human-readable project name |
-| `project_slug` | (auto-generated) | Directory/package name |
+| `project_slug` | *(auto-generated)* | Directory and package name |
 | `project_description` | Multi-agent AI orchestration... | One-line description |
-| `author_name` | Your Name | Author name |
-| `author_email` | you@example.com | Author email |
-| `github_username` | | GitHub username |
-| `python_version` | 3.12 | Python version (3.11, 3.12, 3.13) |
-| `primary_llm` | claude-sonnet-4-6 | Claude model for agents |
-| `license` | MIT | MIT, Apache-2.0, or none |
+| `author_name` | Your Name | |
+| `author_email` | you@example.com | |
+| `github_username` | | GitHub username for links |
+| `python_version` | 3.12 | 3.11 / 3.12 / 3.13 |
+| `primary_llm` | claude-sonnet-4-6 | Claude model for agent invocations |
+| `license` | MIT | MIT / Apache-2.0 / none |
 
-### MCP Integrations
+### Integrations (pick what you need)
 
-| Variable | Default | Required when enabled |
+| Integration | Default | Config required |
 |---|---|---|
-| `enable_linear_mcp` | no | `linear_workspace` |
-| `enable_jira_mcp` | no | `jira_instance_url`, `jira_project_key` |
-| `enable_github_mcp` | yes | -- |
-| `enable_slack_mcp` | no | `slack_team_id` |
-| `enable_telegram_mcp` | no | `telegram_bot_token` |
-| `enable_postgres_mcp` | no | `postgres_connection_string` |
-| `enable_filesystem_mcp` | yes | -- |
-
-### Infrastructure
-
-| Variable | Default | Description |
-|---|---|---|
-| `use_docker` | no | Generate Dockerfile and docker-compose |
-| `ci_provider` | github-actions | CI setup (github-actions or none) |
+| **Jira** | no | `jira_instance_url`, `jira_project_key`, `jira_assignee` |
+| **Confluence** | no | `confluence_url`, `confluence_space_key` |
+| **Linear** | no | `linear_workspace` |
+| **GitHub** | yes | -- |
+| **Slack** | no | `slack_team_id` |
+| **Telegram** | no | `telegram_bot_token` |
+| **PostgreSQL** | no | `postgres_connection_string` |
+| **Filesystem** | yes | -- |
+| **Docker** | no | -- |
+| **GitHub Actions CI** | yes | -- |
 
 ## What You Get
 
 ```
-my-claude-agent-project/
-+-- CLAUDE.md                    # Auto-loaded by Claude Code
-+-- .mcp.json                    # MCP server configurations
-+-- pyproject.toml               # Python project config
-+-- Makefile                     # Dev commands
+my-project/
++-- CLAUDE.md                        # Auto-loaded by Claude Code
++-- .mcp.json                        # MCP server configurations
++-- pyproject.toml                   # Python project (hatchling)
++-- Makefile                         # Dev commands
 +-- agents/
-|   +-- project-manager/CLAUDE.md
-|   +-- tech-lead/CLAUDE.md
-|   +-- architect/CLAUDE.md
-|   +-- developer/CLAUDE.md
-|   +-- tester/CLAUDE.md
+|   +-- business-analyst/CLAUDE.md   # Triage, estimation, priority
+|   +-- project-manager/CLAUDE.md    # Intake, tracking, notifications
+|   +-- tech-lead/CLAUDE.md          # Decomposition, sign-off
+|   +-- architect/CLAUDE.md          # Design, data models, API contracts
+|   +-- developer/CLAUDE.md          # Implementation
+|   +-- tester/CLAUDE.md             # Validation, defect reporting
 +-- src/<package>/
-|   +-- cli.py                   # Click CLI entry point
-|   +-- agent.py                 # Base agent (wraps Claude CLI)
-|   +-- orchestrator.py          # Pipeline orchestrator
-|   +-- config.py                # Configuration loader
-|   +-- agents/                  # Agent role implementations
-+-- tests/                       # pytest test suite
-+-- workflows/
-|   +-- validation-pipeline.md
-|   +-- project-setup.md
-+-- projects/.templates/         # spec.md, architecture.md, task.md
-+-- scripts/                     # setup.sh, run_pipeline.sh, run_agent.sh
-+-- docker/                      # (optional) Dockerfile, docker-compose.yml
-+-- .github/workflows/           # (optional) CI + agent pipeline dispatch
-```
-
-## Agent Pipeline
-
-```
-User -> PM (intake) -> Tech Lead (decompose) -> Architect (design)
-     -> Tech Lead (validate) -> Developer (implement)
-     -> Architect (validate code) -> Tester (test)
-     -> Developer (fix) -> Tech Lead (sign-off) -> PM (close)
-```
-
-Each agent:
-- Has a dedicated `CLAUDE.md` defining its role, tools, and decision authority
-- Is invoked via Claude CLI with MCP server access
-- Validates the previous agent's output before passing to the next
-
-## Usage After Generation
-
-```bash
-cd my-claude-agent-project
-
-# Setup
-bash scripts/setup.sh
-cp .env.example .env  # Add ANTHROPIC_API_KEY
-
-# Run full pipeline
-make pipeline REQUEST="Add user authentication with JWT"
-
-# Run single agent
-make agent ROLE=developer TASK=TASK-001
-
-# Direct Claude CLI
-claude -p "$(cat agents/developer/CLAUDE.md)" --mcp-config .mcp.json "implement TASK-001"
+|   +-- cli.py                       # Click CLI (run, agent, jira-run, jira-watch, status)
+|   +-- agent.py                     # Base agent (wraps Claude CLI)
+|   +-- orchestrator.py              # Pipeline orchestrator
+|   +-- config.py                    # Configuration loader
+|   +-- integrations/
+|       +-- hub.py                   # Notification dispatcher
+|       +-- jira.py                  # Jira REST API client + watcher
+|       +-- confluence.py            # Confluence page publisher
+|       +-- linear.py                # Linear GraphQL client
+|       +-- slack.py                 # Slack Bot API client
+|       +-- telegram.py              # Telegram Bot API client
++-- tests/                           # 21 tests (pytest)
++-- workflows/                       # Pipeline docs
++-- projects/.templates/             # spec.md, architecture.md, task.md
++-- scripts/                         # setup.sh, run_pipeline.sh, run_agent.sh
++-- docker/                          # (optional)
++-- .github/workflows/               # (optional) CI + agent pipeline dispatch
 ```
 
 ## Prerequisites
@@ -128,13 +152,13 @@ claude -p "$(cat agents/developer/CLAUDE.md)" --mcp-config .mcp.json "implement 
 - Python 3.11+
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
 - Node.js 18+ (for MCP servers)
-- An [Anthropic API key](https://console.anthropic.com/)
+- [Anthropic API key](https://console.anthropic.com/)
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Test template generation: `cookiecutter . --no-input`
+3. Test: `pipx run cookiecutter . --no-input && cd my-claude-agent-project && pip install -e ".[dev]" && pytest`
 4. Submit a pull request
 
 ## License
