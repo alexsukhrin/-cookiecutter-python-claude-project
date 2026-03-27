@@ -18,11 +18,12 @@ Multi-agent system where specialized AI agents collaborate through a structured 
 ## Agent Pipeline
 
 ```
-User -> PM (intake) -> Tech Lead (decompose) -> Architect (design) -> Developer (implement) -> Tester (validate) -> Tech Lead (sign-off) -> PM (close)
+Ticket -> BA (triage) -> PM (intake) -> Tech Lead (decompose) -> Architect (design) -> Developer (implement) -> Tester (validate) -> Tech Lead (sign-off) -> PM (close + docs)
 ```
 
 | Agent | Role | Artifacts |
 |---|---|---|
+| **Business Analyst** | Triage, value assessment, estimation, priority | BA analysis comment |
 | **Project Manager** | Task intake, tracking, stakeholder comms | `tasks/`, issue tracker |
 | **Tech Lead** | Decompose, acceptance criteria, sign-off | `spec.md` |
 | **Architect** | System design, data models, API contracts | `architecture.md` |
@@ -50,6 +51,16 @@ make agent ROLE=developer TASK=TASK-001
 ```bash
 claude -p "$(cat agents/developer/CLAUDE.md)" --mcp-config .mcp.json "implement TASK-001"
 ```
+{% if cookiecutter.enable_jira_mcp == "yes" %}
+### Jira-driven flow
+```bash
+# Process a specific ticket (BA triage -> full pipeline -> Confluence)
+{{ cookiecutter.project_slug }} jira-run PROJ-123
+
+# Watch for new assigned tickets
+{{ cookiecutter.project_slug }} jira-watch
+```
+{% endif %}
 
 ## Structure
 

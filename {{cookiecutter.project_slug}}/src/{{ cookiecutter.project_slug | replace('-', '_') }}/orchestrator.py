@@ -10,7 +10,16 @@ from .integrations.hub import NotificationHub
 
 logger = logging.getLogger(__name__)
 
-ROLES = ("project-manager", "tech-lead", "architect", "developer", "tester")
+ROLES = (
+    "business-analyst", "project-manager", "tech-lead",
+    "architect", "developer", "tester",
+)
+
+# BA decision keywords in agent output
+BA_APPROVED = "approved"
+BA_NEEDS_INFO = "needs info"
+BA_ON_HOLD = "on hold"
+BA_DECLINE = "decline"
 
 
 @dataclass
@@ -140,16 +149,30 @@ class Pipeline:
 
         return results
 
+    def _parse_ba_decision(self, ba_output: str) -> str:
+        """Extract BA decision from agent output.
+
+        Looks for 'Decision: <value>' in the output.
+        Returns one of: approved, needs info, on hold, decline.
+        Defaults to 'approved' if not found.
+        """
+        output_lower = ba_output.lower()
+        for keyword in (BA_DECLINE, BA_ON_HOLD, BA_NEEDS_INFO, BA_APPROVED):
+            if keyword in output_lower:
+                return keyword
+        return BA_APPROVED
+
     def run_from_jira(self, issue_key: str) -> dict[str, str]:
         """Run pipeline from an existing Jira ticket.
 
         Full flow:
         1. Fetch ticket from Jira
-        2. PM validates completeness, asks questions in comments if needed
-        3. PM enriches ticket using task template
-        4. Run full pipeline (TL -> Arch -> Dev -> Tester)
-        5. Publish results to Confluence
-        6. Transition Jira to "Review" for customer verification
+        2. BA triages: evaluate business value, estimate, priority, decide
+        3. If BA approved -> PM validates completeness & enriches
+        4. If BA needs info / on hold -> comment in Jira, return to reporter
+        5. Full pipeline (TL -> Arch -> Dev -> Tester)
+        6. Publish results to Confluence
+        7. Transition Jira to "Review" for customer verification
         """
         jira = self.notifications.jira
         if not jira.enabled:
@@ -161,24 +184,8 @@ class Pipeline:
         if not issue:
             raise RuntimeError(f"Could not fetch Jira issue: {issue_key}")
 
-        # Link this pipeline run to the existing Jira ticket
         self.notifications.set_jira_issue(issue_key)
 
-        # 2. PM validates ticket completeness
-        missing = jira.validate_ticket_completeness(issue)
-        if missing:
-            question = (
-                f"Ticket {issue_key} is missing required information:\n"
-                + "\n".join(f"- {m}" for m in missing)
-                + "\n\nPlease provide the missing details."
-            )
-            jira.add_comment(issue_key, question)
-            logger.warning(
-                "Ticket %s incomplete, asked reporter in comments: %s",
-                issue_key, missing
-            )
-
-        # 3. PM enriches ticket via agent
         request_text = (
             f"Jira Ticket: {issue_key}\n"
             f"Summary: {issue['summary']}\n"
@@ -189,19 +196,68 @@ class Pipeline:
         )
 
         results: dict[str, str] = {}
+
+        # 2. BA Triage -- evaluate value, estimate, decide
+        logger.info("=== Step 0: Business Analyst - Triage ===")
+        results["ba_triage"] = self._run_step(
+            "Step 0: BA Triage", "business-analyst",
+            f"Triage this Jira ticket. Evaluate business value, estimate "
+            f"complexity and time, assess priority, and make a decision "
+            f"(Approved / Needs Info / On Hold / Decline). "
+            f"Write your analysis in the standard BA comment format.\n\n{request_text}",
+        )
+
+        # Post BA analysis as Jira comment
+        jira.add_comment(issue_key, results["ba_triage"])
+
+        # 3. Check BA decision
+        decision = self._parse_ba_decision(results["ba_triage"])
+        results["ba_decision"] = decision
+        logger.info("BA decision for %s: %s", issue_key, decision)
+
+        if decision == BA_NEEDS_INFO:
+            jira.transition_issue(issue_key, "Waiting for Customer")
+            logger.info("Ticket %s returned to reporter -- needs more info", issue_key)
+            return results
+
+        if decision == BA_ON_HOLD:
+            jira.transition_issue(issue_key, "Waiting for Customer")
+            jira.add_comment(
+                issue_key,
+                "This ticket has been put on hold for stakeholder review. "
+                "Please evaluate whether this should proceed.",
+            )
+            logger.info("Ticket %s put on hold for customer review", issue_key)
+            return results
+
+        if decision == BA_DECLINE:
+            jira.transition_issue(issue_key, "Won't Do")
+            logger.info("Ticket %s declined by BA", issue_key)
+            return results
+
+        # 4. BA approved -> start full pipeline
         self.notifications.on_pipeline_start(request_text)
 
         try:
-            # PM intake -- validate and enrich
+            # PM validates completeness and enriches
+            missing = jira.validate_ticket_completeness(issue)
+            if missing:
+                question = (
+                    f"Ticket {issue_key} is missing required information:\n"
+                    + "\n".join(f"- {m}" for m in missing)
+                    + "\n\nPlease provide the missing details."
+                )
+                jira.add_comment(issue_key, question)
+                logger.warning("Ticket %s incomplete: %s", issue_key, missing)
+
             results["pm_intake"] = self._run_step(
                 "Step 1: PM Validate & Enrich", "project-manager",
                 f"Validate and enrich this Jira ticket. "
-                f"Check if all acceptance criteria are clear. "
-                f"Create a local task file using the template from "
+                f"BA has approved it with this analysis:\n{results['ba_triage']}\n\n"
+                f"Check acceptance criteria. Create a local task file from "
                 f"projects/.templates/task.md.\n\n{request_text}",
             )
 
-            # Standard pipeline from here
             results["tl_decompose"] = self._run_step(
                 "Step 2: Tech Lead Decompose", "tech-lead",
                 f"Decompose into spec and subtasks:\n\n{results['pm_intake']}",

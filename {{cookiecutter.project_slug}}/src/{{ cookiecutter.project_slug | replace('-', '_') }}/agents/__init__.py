@@ -4,6 +4,7 @@ from __future__ import annotations
 from ..agent import Agent
 
 AGENT_ROLES = {
+    "business-analyst": "Ticket triage, business value assessment, priority, estimation",
     "project-manager": "Task intake, tracking, stakeholder communication",
     "tech-lead": "Decomposition, prioritization, final sign-off",
     "architect": "System design, data models, API contracts",
