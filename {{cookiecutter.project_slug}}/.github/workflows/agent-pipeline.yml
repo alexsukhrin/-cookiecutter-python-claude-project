@@ -1,0 +1,46 @@
+name: Agent Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      request:
+        description: "Task request for the agent pipeline"
+        required: true
+        type: string
+      fast_track:
+        description: "Use fast-track pipeline"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "{{ cookiecutter.python_version }}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ "{{ secrets.ANTHROPIC_API_KEY }}" }}
+        run: |
+          if [ "${{ "{{ inputs.fast_track }}" }}" = "true" ]; then
+            python -m {{ cookiecutter.project_slug | replace('-', '_') }}.cli run --fast "${{ "{{ inputs.request }}" }}"
+          else
+            python -m {{ cookiecutter.project_slug | replace('-', '_') }}.cli run "${{ "{{ inputs.request }}" }}"
+          fi

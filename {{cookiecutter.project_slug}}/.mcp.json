@@ -1,0 +1,53 @@
+{
+  "mcpServers": {
+{%- if cookiecutter.enable_linear_mcp == "yes" %}
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    },
+{%- endif %}
+{%- if cookiecutter.enable_jira_mcp == "yes" %}
+    "jira": {
+      "type": "http",
+      "url": "{{ cookiecutter.jira_instance_url }}/gateway/api/mcp"
+    },
+{%- endif %}
+{%- if cookiecutter.enable_github_mcp == "yes" %}
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
+    },
+{%- endif %}
+{%- if cookiecutter.enable_slack_mcp == "yes" %}
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-slack"],
+      "env": {
+        "SLACK_TEAM_ID": "{{ cookiecutter.slack_team_id }}"
+      }
+    },
+{%- endif %}
+{%- if cookiecutter.enable_telegram_mcp == "yes" %}
+    "telegram": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-telegram"],
+      "env": {
+        "TELEGRAM_BOT_TOKEN": "{{ cookiecutter.telegram_bot_token }}"
+      }
+    },
+{%- endif %}
+{%- if cookiecutter.enable_postgres_mcp == "yes" %}
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "{{ cookiecutter.postgres_connection_string }}"]
+    },
+{%- endif %}
+{%- if cookiecutter.enable_filesystem_mcp == "yes" %}
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    },
+{%- endif %}
+    "_placeholder": true
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "project_name": "My Claude Agent Project",
+  "project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '-').replace('_', '-') }}",
+  "project_description": "Multi-agent AI orchestration project powered by Claude CLI",
+  "author_name": "Your Name",
+  "author_email": "you@example.com",
+  "github_username": "",
+  "python_version": ["3.12", "3.11", "3.13"],
+  "primary_llm": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5"],
+  "license": ["MIT", "Apache-2.0", "none"],
+
+  "enable_linear_mcp": ["no", "yes"],
+  "linear_workspace": "",
+
+  "enable_jira_mcp": ["no", "yes"],
+  "jira_instance_url": "",
+  "jira_project_key": "",
+
+  "enable_github_mcp": ["yes", "no"],
+
+  "enable_slack_mcp": ["no", "yes"],
+  "slack_team_id": "",
+
+  "enable_telegram_mcp": ["no", "yes"],
+  "telegram_bot_token": "",
+
+  "enable_postgres_mcp": ["no", "yes"],
+  "postgres_connection_string": "postgresql://localhost:5432/mydb",
+
+  "enable_filesystem_mcp": ["yes", "no"],
+
+  "use_docker": ["no", "yes"],
+  "ci_provider": ["github-actions", "none"],
+
+  "_copy_without_render": [
+    "*.png",
+    "*.ico",
+    "*.woff",
+    "*.woff2"
+  ]
+}

@@ -1,0 +1,26 @@
+services:
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - ../.env
+    volumes:
+      - ../projects:/app/projects
+      - ../tasks:/app/tasks
+    working_dir: /app
+{% if cookiecutter.enable_postgres_mcp == "yes" %}
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: {{ cookiecutter.postgres_connection_string.split('/')[-1] if '/' in cookiecutter.postgres_connection_string else 'mydb' }}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+{% endif %}
