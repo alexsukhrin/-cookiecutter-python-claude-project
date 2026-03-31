@@ -178,9 +178,18 @@ class JiraClient:
             f'AND status = "{status}" '
             f"ORDER BY created DESC"
         )
-        import urllib.parse
-        encoded_jql = urllib.parse.quote(jql)
-        result = self._request("GET", f"search?jql={encoded_jql}&maxResults=50")
+        result = self._request(
+            "POST",
+            "search/jql",
+            {
+                "jql": jql,
+                "maxResults": 50,
+                "fields": [
+                    "summary", "status", "priority", "issuetype",
+                    "reporter", "assignee", "description",
+                ],
+            },
+        )
         if not result:
             return []
 
