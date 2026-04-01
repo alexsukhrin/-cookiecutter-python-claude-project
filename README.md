@@ -42,12 +42,15 @@ The BA can **reject or pause** a ticket before any development starts (Needs Inf
 
 ## Features
 
-- **6-agent pipeline** with Business Analyst triage gate
-- **Claude CLI under the hood** -- each agent is a Claude Code invocation with dedicated CLAUDE.md
+- **7-agent pipeline** with Business Analyst triage gate (+ DevOps agent)
+- **Two modes**: Claude Code slash commands (`/ba`, `/pipeline`, `/deploy`) for interactive use + subprocess CLI for automation
+- **Feature branches** -- Developer/Tester agents work on `agent/<slug>` branch with auto-commit
+- **Auto-create merge requests** after pipeline completes (via git push options)
 - **Jira-driven flow** -- watch tickets, BA triage, auto-process, comment results back
+- **Slack watcher** -- poll channel, respond in threads, run pipeline via `analyze` command
 - **Confluence** -- auto-publish pipeline results as documentation pages
 - **MCP servers** -- Jira, Linear, GitHub, Slack, Telegram, PostgreSQL, Confluence, Filesystem
-- **Python CLI** -- `run`, `agent`, `jira-run`, `jira-watch`, `status` commands
+- **Python CLI** -- `run`, `agent`, `jira-run`, `jira-watch`, `slack-watch`, `status` commands
 - **Tested scaffold** -- 21 passing tests, ruff clean, mypy-ready
 - **Optional** -- Docker, GitHub Actions CI/CD
 
@@ -71,16 +74,32 @@ cp .env.example .env   # add ANTHROPIC_API_KEY + integration tokens
 make pipeline REQUEST="Add user authentication with JWT"
 
 # Process a Jira ticket (BA triage -> pipeline -> Confluence)
-my-project jira-run PROJ-123
+make jira-run ISSUE=PROJ-123
 
 # Watch Jira for new tickets and auto-process
-my-project jira-watch --assignee bot@company.com
+make jira-watch
+
+# Watch Slack channel and respond to messages
+make slack-watch
 
 # Run a single agent
 make agent ROLE=developer TASK=TASK-001
 
-# Direct Claude CLI
-claude -p "$(cat agents/developer/CLAUDE.md)" --mcp-config .mcp.json "implement TASK-001"
+# Show status
+make status
+```
+
+### Claude Code slash commands (interactive)
+
+Inside Claude Code, use slash commands for interactive work with full project context:
+
+```
+/ba Add user authentication with JWT
+/pipeline Migrate database to PostgreSQL
+/develop implement TASK-001
+/test validate auth module
+/review
+/deploy v1.0.0
 ```
 
 ## Template Variables
@@ -118,6 +137,11 @@ claude -p "$(cat agents/developer/CLAUDE.md)" --mcp-config .mcp.json "implement 
 my-project/
 +-- CLAUDE.md                        # Auto-loaded by Claude Code
 +-- .mcp.json                        # MCP server configurations
++-- .claude/commands/                 # Claude Code slash commands
+|   +-- ba.md, pm.md, tech-lead.md   # /ba, /pm, /tech-lead
+|   +-- architect.md, develop.md     # /architect, /develop
+|   +-- test.md, review.md           # /test, /review
+|   +-- deploy.md, pipeline.md       # /deploy, /pipeline
 +-- pyproject.toml                   # Python project (hatchling)
 +-- Makefile                         # Dev commands
 +-- agents/
@@ -127,18 +151,22 @@ my-project/
 |   +-- architect/CLAUDE.md          # Design, data models, API contracts
 |   +-- developer/CLAUDE.md          # Implementation
 |   +-- tester/CLAUDE.md             # Validation, defect reporting
+|   +-- devops/CLAUDE.md             # Deployment, CI/CD, infrastructure
 +-- src/<package>/
 |   +-- cli.py                       # Click CLI (run, agent, jira-run, jira-watch, status)
-|   +-- agent.py                     # Base agent (wraps Claude CLI)
-|   +-- orchestrator.py              # Pipeline orchestrator
+|   +-- agent.py                     # Base agent (wraps Claude CLI, feature branches)
+|   +-- orchestrator.py              # Pipeline orchestrator (auto-MR)
 |   +-- config.py                    # Configuration loader
 |   +-- integrations/
-|       +-- hub.py                   # Notification dispatcher
-|       +-- jira.py                  # Jira REST API client + watcher
-|       +-- confluence.py            # Confluence page publisher
-|       +-- linear.py                # Linear GraphQL client
-|       +-- slack.py                 # Slack Bot API client
-|       +-- telegram.py              # Telegram Bot API client
+|   |   +-- hub.py                   # Notification dispatcher
+|   |   +-- jira.py                  # Jira REST API client
+|   |   +-- confluence.py            # Confluence page publisher
+|   |   +-- linear.py                # Linear GraphQL client
+|   |   +-- slack.py                 # Slack Bot API client
+|   |   +-- telegram.py              # Telegram Bot API client
+|   +-- watchers/
+|       +-- jira_watcher.py          # Poll Jira for new tickets
+|       +-- slack_watcher.py         # Poll Slack, respond in threads
 +-- tests/                           # 21 tests (pytest)
 +-- workflows/                       # Pipeline docs
 +-- projects/.templates/             # spec.md, architecture.md, task.md

@@ -29,6 +29,18 @@ pipeline:
 
 agent:
 	$(VENV)/bin/python -m $(PACKAGE).cli agent --role $(ROLE) --task $(TASK)
+{% if cookiecutter.enable_jira_mcp == "yes" %}
+jira-run:
+	$(VENV)/bin/python -m $(PACKAGE).cli jira-run $(ISSUE)
+
+jira-watch:
+	$(VENV)/bin/python -m $(PACKAGE).cli jira-watch
+{% endif %}{% if cookiecutter.enable_slack_mcp == "yes" %}
+slack-watch:
+	$(VENV)/bin/python -m $(PACKAGE).cli slack-watch
+{% endif %}
+status:
+	$(VENV)/bin/python -m $(PACKAGE).cli status
 {% if cookiecutter.use_docker == "yes" %}
 docker-build:
 	docker compose -f docker/docker-compose.yml build
