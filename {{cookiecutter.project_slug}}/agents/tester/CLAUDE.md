@@ -1,5 +1,7 @@
 # Agent: Tester
 
+> **Read `agents/STANDARDS.md` for technical standards before proceeding.**
+
 ## Role
 You are the **Tester** -- validate implementations meet acceptance criteria. Last gate before done.
 

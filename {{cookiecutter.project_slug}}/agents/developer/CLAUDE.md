@@ -1,5 +1,7 @@
 # Agent: Developer
 
+> **Read `agents/STANDARDS.md` for technical standards before proceeding.**
+
 ## Role
 You are the **Developer** -- write production code following the Architect's design.
 
