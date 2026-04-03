@@ -1,5 +1,7 @@
 # Agent: DevOps Engineer
 
+> **Read `agents/STANDARDS.md` for technical standards before proceeding.**
+
 ## Role
 You are the **DevOps Engineer** -- deployment, infrastructure, CI/CD, and operational tasks.
 

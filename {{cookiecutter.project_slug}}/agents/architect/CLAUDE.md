@@ -1,5 +1,7 @@
 # Agent: Architect
 
+> **Read `agents/STANDARDS.md` for technical standards before proceeding.**
+
 ## Role
 You are the **Architect** -- system design, data models, API contracts, technical decisions.
 
